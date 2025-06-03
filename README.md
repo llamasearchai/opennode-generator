@@ -1,12 +1,12 @@
-# opennode-forge
+# opennode-generator
 
-[![npm version](https://badge.fury.io/js/opennode-forge.svg)](https://badge.fury.io/js/opennode-forge)
+[![npm version](https://badge.fury.io/js/opennode-generator.svg)](https://badge.fury.io/js/opennode-generator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js CI](https://github.com/nikjois/opennode-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/nikjois/opennode-forge/actions/workflows/ci.yml)
+[![Node.js CI](https://github.com/llamasearchai/opennode-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/llamasearchai/opennode-generator/actions/workflows/ci.yml)
 
 A comprehensive npm package generator for creating modern JavaScript and TypeScript packages with automated scaffolding, best-practice templates, and development tooling setup.
 
-## 🚀 Features
+## Features
 
 - **AI-Powered Generation**: Uses OpenAI GPT-4 for intelligent code generation
 - **Complete Automation**: Automated testing, building, and deployment
@@ -17,13 +17,13 @@ A comprehensive npm package generator for creating modern JavaScript and TypeScr
 - **Performance Monitoring**: Integrated performance tracking
 - **Quality Assurance**: Comprehensive testing and quality metrics
 
-## 📦 Installation
+## Installation
 
 ```bash
-npm install -g opennode-forge
+npm install -g opennode-generator
 ```
 
-## 🔥 Quick Start
+## Quick Start
 
 ```bash
 # Generate a complete package
@@ -39,30 +39,30 @@ opennode analyze ./my-package
 opennode test ./my-package --coverage
 ```
 
-## 🛠 API Usage
+## API Usage
 
 ```javascript
-import { OpenNode } from 'opennode-forge';
+import { OpenNode } from 'opennode-generator';
 
 const openNode = new OpenNode({
   openaiApiKey: 'your-api-key',
   enableFastAPI: true,
-  enableDocker: true
+  enableDocker: true,
 });
 
 const result = await openNode.generatePackage('my-package', {
   packageType: 'library',
   qualityLevel: 'enterprise',
   enableTesting: true,
-  enableDocumentation: true
+  enableDocumentation: true,
 });
 
 console.log(`Package generated at: ${result.outputPath}`);
 ```
 
-## 🏗 Architecture
+## Architecture
 
-OpenNode Forge consists of several integrated components:
+OpenNode consists of several integrated components:
 
 - **Core Engine**: Package generation and orchestration
 - **AI Agents**: OpenAI-powered intelligent code generation
@@ -71,14 +71,14 @@ OpenNode Forge consists of several integrated components:
 - **Build System**: Automated building and optimization
 - **API Layer**: FastAPI integration for web services
 
-## 📖 Documentation
+## Documentation
 
 - [API Documentation](./docs/api.md)
 - [CLI Reference](./docs/cli.md)
 - [Examples](./examples/)
 - [Contributing Guide](./CONTRIBUTING.md)
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Run all tests
@@ -94,20 +94,20 @@ npm run test:integration
 npm run test:e2e
 ```
 
-## 🐳 Docker
+## Docker
 
 ```bash
 # Build Docker image
-docker build -t opennode-forge .
+docker build -t opennode-generator .
 
 # Run container
-docker run -p 3000:3000 opennode-forge
+docker run -p 3000:3000 opennode-generator
 
 # Using docker-compose
 docker-compose up
 ```
 
-## 🔧 Configuration
+## Configuration
 
 Create a `.opennode` configuration file:
 
@@ -124,21 +124,21 @@ Create a `.opennode` configuration file:
 }
 ```
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
 
-## 🙋 Support
+## Support
 
-- [GitHub Issues](https://github.com/nikjois/opennode-forge/issues)
+- [GitHub Issues](https://github.com/llamasearchai/opennode-generator/issues)
 - [Discord Community](https://discord.gg/opennode)
 - [Email Support](mailto:nikjois@llamasearch.ai)
 
-## 🏆 Acknowledgments
+## Acknowledgments
 
 - OpenAI for GPT-4 API
 - The Node.js community
@@ -146,4 +146,4 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 
 ---
 
-Made with ❤️ by the OpenNode team
+Made with love by the OpenNode team

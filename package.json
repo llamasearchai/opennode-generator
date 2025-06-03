@@ -1,6 +1,6 @@
 {
-  "name": "opennode-forge",
-  "version": "1.0.0",
+  "name": "opennode-generator",
+  "version": "1.1.0",
   "description": "A comprehensive npm package generator for creating modern JavaScript and TypeScript packages with automated scaffolding, best-practice templates, and development tooling setup.",
   "type": "commonjs",
   "main": "dist/index.js",
@@ -87,12 +87,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/llamasearchai/opennode-forge.git"
+    "url": "git+https://github.com/llamasearchai/opennode-generator.git"
   },
   "bugs": {
-    "url": "https://github.com/llamasearchai/opennode-forge/issues"
+    "url": "https://github.com/llamasearchai/opennode-generator/issues"
   },
-  "homepage": "https://github.com/llamasearchai/opennode-forge#readme",
+  "homepage": "https://github.com/llamasearchai/opennode-generator#readme",
   "funding": {
     "type": "github",
     "url": "https://github.com/sponsors/nikjois"

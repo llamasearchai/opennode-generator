@@ -21,7 +21,7 @@ class PerformanceTester {
   }
 
   async runAllTests() {
-    console.log('🚀 Starting performance tests...\n');
+    console.log('Starting performance tests...\n');
 
     try {
       await this.testPackageGeneration();
@@ -33,18 +33,18 @@ class PerformanceTester {
       this.generateSummary();
       await this.saveResults();
       
-      console.log('\n✅ Performance tests completed successfully!');
+      console.log('\nPerformance tests completed successfully!');
       this.displayResults();
       
     } catch (error) {
-      console.error('❌ Performance tests failed:', error);
+      console.error('ERROR: Performance tests failed:', error);
       process.exit(1);
     }
   }
 
   async testPackageGeneration() {
     const testName = 'Package Generation';
-    console.log(`🧪 Testing ${testName}...`);
+    console.log(`Testing ${testName}...`);
 
     const iterations = 10;
     const times = [];
@@ -66,7 +66,7 @@ class PerformanceTester {
 
   async testAnalysisEngine() {
     const testName = 'Code Analysis';
-    console.log(`🧪 Testing ${testName}...`);
+    console.log(`Testing ${testName}...`);
 
     const iterations = 5;
     const times = [];
@@ -88,7 +88,7 @@ class PerformanceTester {
 
   async testTemplateProcessing() {
     const testName = 'Template Processing';
-    console.log(`🧪 Testing ${testName}...`);
+    console.log(`Testing ${testName}...`);
 
     const iterations = 20;
     const times = [];
@@ -110,7 +110,7 @@ class PerformanceTester {
 
   async testCLIPerformance() {
     const testName = 'CLI Startup Time';
-    console.log(`🧪 Testing ${testName}...`);
+    console.log(`Testing ${testName}...`);
 
     const iterations = 5;
     const times = [];
@@ -132,7 +132,7 @@ class PerformanceTester {
 
   async testMemoryUsage() {
     const testName = 'Memory Usage';
-    console.log(`🧪 Testing ${testName}...`);
+    console.log(`Testing ${testName}...`);
 
     const initialMemory = process.memoryUsage();
     
@@ -304,13 +304,13 @@ class PerformanceTester {
     const latestPath = path.join(process.cwd(), 'performance-results.json');
     await fs.writeJson(latestPath, this.results, { spaces: 2 });
     
-    console.log(`\n📊 Results saved to: ${filepath}`);
+    console.log(`\nResults saved to: ${filepath}`);
   }
 
   displayResults() {
     const { summary } = this.results;
     
-    console.log('\n📊 Performance Test Summary:');
+    console.log('\nPerformance Test Summary:');
     console.log('================================');
     console.log(`Total Tests: ${summary.totalTests}`);
     console.log(`Overall Grade: ${summary.performanceGrade}`);
@@ -325,12 +325,12 @@ class PerformanceTester {
 
     // Performance thresholds
     if (summary.performanceGrade === 'F') {
-      console.log('\n⚠️  Performance issues detected! Consider optimization.');
+      console.log('\nWARNING: Performance issues detected! Consider optimization.');
       process.exit(1);
     } else if (summary.performanceGrade === 'D') {
-      console.log('\n⚠️  Performance could be improved.');
+      console.log('\nWARNING: Performance could be improved.');
     } else {
-      console.log('\n✅ Performance is within acceptable limits.');
+      console.log('\nPerformance is within acceptable limits.');
     }
   }
 }

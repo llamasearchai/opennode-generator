@@ -22,7 +22,7 @@ const chalk = {
 };
 
 async function main() {
-  console.log(chalk.blue('🚀 Preparing OpenNode for Publishing\n'));
+  console.log(chalk.blue('Preparing OpenNode for Publishing\n'));
 
   try {
     // Step 1: Clean up
@@ -41,7 +41,7 @@ async function main() {
       execSync('npm run lint', { stdio: 'inherit' });
       execSync('npm run format', { stdio: 'inherit' });
     } catch (error) {
-      console.log(chalk.yellow('⚠ Linting had some issues, continuing...\n'));
+      console.log(chalk.yellow('WARNING: Linting had some issues, continuing...\n'));
     }
     console.log(chalk.green('✓ Linting and formatting complete\n'));
 
@@ -65,7 +65,7 @@ async function main() {
     await prepareForPublishing();
     console.log(chalk.green('✓ Ready for publishing\n'));
 
-    console.log(chalk.green('🎉 OpenNode is ready for publishing!\n'));
+    console.log(chalk.green('OpenNode is ready for publishing!\n'));
     console.log(chalk.blue('Next steps:'));
     console.log(chalk.white('1. npm publish --access public'));
     console.log(chalk.white('2. git push origin main'));
@@ -94,7 +94,7 @@ async function runEssentialTests() {
       stdio: 'inherit' 
     });
   } catch (error) {
-    console.log(chalk.yellow('⚠ Some tests had issues, but essential functionality is working'));
+    console.log(chalk.yellow('WARNING: Some tests had issues, but essential functionality is working'));
   }
 }
 
@@ -170,11 +170,11 @@ async function updateReadme() {
 
 [![npm version](https://badge.fury.io/js/${packageJson.name}.svg)](https://badge.fury.io/js/${packageJson.name})
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js CI](https://github.com/nikjois/opennode-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/nikjois/opennode-forge/actions/workflows/ci.yml)
+[![Node.js CI](https://github.com/llamasearchai/opennode-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/llamasearchai/opennode-generator/actions/workflows/ci.yml)
 
 ${packageJson.description}
 
-## 🚀 Features
+## Features
 
 - **AI-Powered Generation**: Uses OpenAI GPT-4 for intelligent code generation
 - **Complete Automation**: Automated testing, building, and deployment
@@ -185,13 +185,13 @@ ${packageJson.description}
 - **Performance Monitoring**: Integrated performance tracking
 - **Quality Assurance**: Comprehensive testing and quality metrics
 
-## 📦 Installation
+## Installation
 
 \`\`\`bash
 npm install -g ${packageJson.name}
 \`\`\`
 
-## 🔥 Quick Start
+## Quick Start
 
 \`\`\`bash
 # Generate a complete package
@@ -207,7 +207,7 @@ opennode analyze ./my-package
 opennode test ./my-package --coverage
 \`\`\`
 
-## 🛠 API Usage
+## API Usage
 
 \`\`\`javascript
 import { OpenNode } from '${packageJson.name}';
@@ -228,9 +228,9 @@ const result = await openNode.generatePackage('my-package', {
 console.log(\`Package generated at: \${result.outputPath}\`);
 \`\`\`
 
-## 🏗 Architecture
+## Architecture
 
-OpenNode Forge consists of several integrated components:
+OpenNode consists of several integrated components:
 
 - **Core Engine**: Package generation and orchestration
 - **AI Agents**: OpenAI-powered intelligent code generation
@@ -239,14 +239,14 @@ OpenNode Forge consists of several integrated components:
 - **Build System**: Automated building and optimization
 - **API Layer**: FastAPI integration for web services
 
-## 📖 Documentation
+## Documentation
 
 - [API Documentation](./docs/api.md)
 - [CLI Reference](./docs/cli.md)
 - [Examples](./examples/)
 - [Contributing Guide](./CONTRIBUTING.md)
 
-## 🧪 Testing
+## Testing
 
 \`\`\`bash
 # Run all tests
@@ -262,7 +262,7 @@ npm run test:integration
 npm run test:e2e
 \`\`\`
 
-## 🐳 Docker
+## Docker
 
 \`\`\`bash
 # Build Docker image
@@ -275,7 +275,7 @@ docker run -p 3000:3000 opennode-forge
 docker-compose up
 \`\`\`
 
-## 🔧 Configuration
+## Configuration
 
 Create a \`.opennode\` configuration file:
 
@@ -292,21 +292,21 @@ Create a \`.opennode\` configuration file:
 }
 \`\`\`
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
 
-## 🙋 Support
+## Support
 
 - [GitHub Issues](https://github.com/nikjois/opennode-forge/issues)
 - [Discord Community](https://discord.gg/opennode)
 - [Email Support](mailto:nikjois@llamasearch.ai)
 
-## 🏆 Acknowledgments
+## Acknowledgments
 
 - OpenAI for GPT-4 API
 - The Node.js community
@@ -314,7 +314,7 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 
 ---
 
-Made with ❤️ by the OpenNode team
+Made with love by the OpenNode team
 `;
 
   await fs.writeFile('README.md', readme);
