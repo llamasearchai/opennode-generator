@@ -87,12 +87,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nikjois/opennode-forge.git"
+    "url": "git+https://github.com/llamasearchai/opennode-forge.git"
   },
   "bugs": {
-    "url": "https://github.com/nikjois/opennode-forge/issues"
+    "url": "https://github.com/llamasearchai/opennode-forge/issues"
   },
-  "homepage": "https://github.com/nikjois/opennode-forge#readme",
+  "homepage": "https://github.com/llamasearchai/opennode-forge#readme",
   "funding": {
     "type": "github",
     "url": "https://github.com/sponsors/nikjois"
