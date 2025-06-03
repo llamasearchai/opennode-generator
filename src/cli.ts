@@ -23,7 +23,7 @@ const program = new Command();
 program
   .name('opennode')
   .description('AI-Driven npm Package Generator - Complete Master Program')
-  .version('1.0.0');
+  .version('1.1.0');
 
 /**
  * Generate command - Core functionality

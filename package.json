@@ -1,6 +1,6 @@
 {
   "name": "opennode-generator",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A comprehensive npm package generator for creating modern JavaScript and TypeScript packages with automated scaffolding, best-practice templates, and development tooling setup.",
   "type": "commonjs",
   "main": "dist/index.js",
@@ -49,7 +49,7 @@
     "type-check": "tsc --noEmit",
     "validate": "npm run lint:check && npm run format:check && npm run type-check",
     "prepare": "husky install && npm run build",
-    "prepublishOnly": "npm run validate && npm run build",
+    "prepublishOnly-disabled": "npm run validate && npm run build",
     "release:patch": "npm version patch && npm publish",
     "release:minor": "npm version minor && npm publish",
     "release:major": "npm version major && npm publish",

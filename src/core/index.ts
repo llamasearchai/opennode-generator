@@ -68,23 +68,45 @@ export class OpenNode extends EventEmitter {
   constructor(config: OpenNodeConfig = {}) {
     super();
 
-    this.config = {
-      openaiApiKey: config.openaiApiKey || process.env.OPENAI_API_KEY || '',
-      provider: config.provider || 'openai',
-      model: config.model || 'gpt-4',
-      temperature: config.temperature ?? 0.3,
-      maxTokens: config.maxTokens || 2000,
-      outputDir: config.outputDir || './output',
-      enableFastAPI: config.enableFastAPI ?? true,
-      enableDocker: config.enableDocker ?? true,
-      enableSecurity: config.enableSecurity ?? true,
-      enableMonitoring: config.enableMonitoring ?? true,
-      fastApiEndpoint: config.fastApiEndpoint || 'http://localhost:8000',
-      dockerRegistry: config.dockerRegistry || 'ghcr.io',
-      verbose: config.verbose ?? false,
-    };
-
+    // Validate and sanitize configuration
+    this.config = this.validateAndSanitizeConfig(config);
     this.initializeComponents();
+  }
+
+  /**
+   * Validate and sanitize configuration for security
+   */
+  private validateAndSanitizeConfig(config: OpenNodeConfig): Required<OpenNodeConfig> {
+    // Validate API key
+    const apiKey = config.openaiApiKey || process.env.OPENAI_API_KEY || '';
+    if (apiKey && (apiKey.includes('your_api') || apiKey.length < 10)) {
+      console.warn('SECURITY WARNING: Invalid or placeholder API key detected');
+    }
+
+    // Validate and sanitize output directory
+    const outputDir = this.sanitizePath(config.outputDir || './output');
+    
+    // Validate FastAPI endpoint
+    const fastApiEndpoint = this.validateUrl(config.fastApiEndpoint || 'http://localhost:8000');
+    
+    // Validate Docker registry
+    const dockerRegistry = this.sanitizeString(config.dockerRegistry || 'ghcr.io');
+
+    return {
+      openaiApiKey: apiKey,
+      provider: config.provider || 'openai',
+      model: this.sanitizeString(config.model || 'gpt-4'),
+      temperature: this.clampNumber(config.temperature ?? 0.3, 0, 2),
+      maxTokens: this.clampNumber(config.maxTokens || 2000, 1, 8000),
+      outputDir,
+      enableFastAPI: Boolean(config.enableFastAPI ?? true),
+      enableDocker: Boolean(config.enableDocker ?? true),
+      enableSecurity: Boolean(config.enableSecurity ?? true),
+      enableMonitoring: Boolean(config.enableMonitoring ?? true),
+      fastApiEndpoint,
+      dockerRegistry,
+      verbose: Boolean(config.verbose ?? false),
+    };
   }
 
   private initializeComponents(): void {
@@ -158,12 +180,29 @@ export class OpenNode extends EventEmitter {
     config: Partial<GenerationConfig> = {}
   ): Promise<GenerationResult> {
     const startTime = Date.now();
-    const packageName = this.sanitizePackageName(idea);
-    const outputPath = path.join(this.config.outputDir, packageName);
-
-    this.emit('generation:started', { packageName, idea });
+    let packageName = '';
+    let outputPath = '';
 
     try {
+      // Security validation
+      this.validateGenerationInput(idea, config);
+
+      packageName = this.sanitizePackageName(idea);
+      outputPath = this.sanitizePath(path.join(this.config.outputDir, packageName));
+
+      // Check for path traversal attempts
+      if (!outputPath.startsWith(this.config.outputDir)) {
+        throw new Error('SECURITY: Invalid output path detected');
+      }
+
+      this.emit('generation:started', { packageName, idea: this.sanitizeString(idea) });
+
+      // Security logging
+      this.securityLog('package_generation_started', {
+        packageName,
+        timestamp: new Date().toISOString(),
+        userAgent: process.env.USER_AGENT || 'unknown',
+      });
       // Step 1: AI-powered package analysis and planning
       this.emit('generation:progress', {
         step: 'Planning',
@@ -885,8 +924,115 @@ export default {
   }
 
   /**
-   * Utility methods
+   * Security and utility methods
    */
+  private sanitizePath(inputPath: string): string {
+    // Remove dangerous path traversal patterns
+    const sanitized = inputPath
+      .replace(/\.\./g, '') // Remove .. patterns
+      .replace(/[<>:"|?*]/g, '') // Remove invalid filename characters
+      .replace(/\\/g, '/') // Normalize path separators
+      .replace(/\/+/g, '/'); // Remove duplicate slashes
+
+    // Ensure path doesn't start with / (absolute path)
+    return sanitized.startsWith('/') ? '.' + sanitized : sanitized;
+  }
+
+  private validateUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      // Only allow http and https protocols
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        console.warn(`SECURITY WARNING: Invalid protocol in URL: ${parsed.protocol}`);
+        return 'http://localhost:8000';
+      }
+      return url;
+    } catch (error) {
+      console.warn(`SECURITY WARNING: Invalid URL provided: ${url}`);
+      return 'http://localhost:8000';
+    }
+  }
+
+  private sanitizeString(input: string): string {
+    // Remove potentially dangerous characters
+    return input
+      .replace(/[<>'"&;`${}()|\\]/g, '') // Remove script injection characters
+      .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+      .trim()
+      .substring(0, 100); // Limit length
+  }
+
+  private clampNumber(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  private validateGenerationInput(idea: string, config: Partial<GenerationConfig>): void {
+    // Validate idea
+    if (!idea || typeof idea !== 'string') {
+      throw new Error('SECURITY: Invalid idea parameter');
+    }
+
+    if (idea.length > 200) {
+      throw new Error('SECURITY: Idea too long (max 200 characters)');
+    }
+
+    // Check for dangerous patterns
+    const dangerousPatterns = [
+      /\.\.\//, // Path traversal
+      /<script/i, // XSS
+      /javascript:/i, // JavaScript protocol
+      /data:/i, // Data protocol
+      /eval\(/i, // Code injection
+      /exec\(/i, // Command injection
+      /system\(/i, // System calls
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(idea)) {
+        throw new Error('SECURITY: Dangerous pattern detected in idea');
+      }
+    }
+
+    // Validate config if provided
+    if (config.packageName && config.packageName.length > 100) {
+      throw new Error('SECURITY: Package name too long');
+    }
+
+    if (config.outputDir && config.outputDir.includes('..')) {
+      throw new Error('SECURITY: Path traversal detected in outputDir');
+    }
+  }
+
+  private securityLog(event: string, data: any): void {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      event,
+      data: this.sanitizeLogData(data),
+      pid: process.pid,
+      nodeVersion: process.version,
+    };
+
+    // In production, this would go to a secure logging service
+    if (this.config.verbose) {
+      console.log('SECURITY LOG:', JSON.stringify(logEntry));
+    }
+  }
+
+  private sanitizeLogData(data: any): any {
+    const sanitized = { ...data };
+    
+    // Remove sensitive information from logs
+    const sensitiveKeys = ['apiKey', 'password', 'secret', 'token', 'key'];
+    
+    for (const key of sensitiveKeys) {
+      if (sanitized[key]) {
+        sanitized[key] = '[REDACTED]';
+      }
+    }
+
+    return sanitized;
+  }
+
   private sanitizePackageName(idea: string | any): string {
     // Ensure we have a string to work with
     const ideaStr = typeof idea === 'string' ? idea : String(idea || 'package');
