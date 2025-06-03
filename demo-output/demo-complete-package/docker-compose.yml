@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  demo-complete-package:
+    build: .
+    volumes:
+      - .:/app
+      - /app/node_modules
+    working_dir: /app
+    command: node dist/index.js

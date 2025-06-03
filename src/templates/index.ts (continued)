@@ -1,0 +1,1036 @@
+devDependencies: {
+  'typescript': '^5.2.0',
+  '@types/react': '^18.2.0',
+  'react': '^18.2.0',
+  'react-dom': '^18.2.0',
+  '@storybook/react': '^7.4.0',
+  '@storybook/addon-essentials': '^7.4.0',
+  '@storybook/addon-interactions': '^7.4.0',
+  '@storybook/testing-library': '^0.2.0',
+  'jest': '^29.6.0',
+  '@testing-library/react': '^14.0.0',
+  '@testing-library/jest-dom': '^6.1.0',
+  'rollup': '^3.28.0',
+  '@rollup/plugin-typescript': '^11.1.0',
+  '@rollup/plugin-commonjs': '^25.0.0',
+  '@rollup/plugin-node-resolve': '^15.2.0',
+  'postcss': '^8.4.0',
+  '@emotion/react': '^11.11.0',
+  '@emotion/styled': '^11.11.0'
+},
+scripts: {
+  'build': 'rollup -c',
+  'dev': 'rollup -c -w',
+  'storybook': 'storybook dev -p 6006',
+  'build-storybook': 'storybook build',
+  'test': 'jest',
+  'test:watch': 'jest --watch',
+  'test:coverage': 'jest --coverage'
+}
+});
+
+// Express API Template
+this.templates.set('express-api', {
+  id: 'express-api',
+  name: 'Express API Server',
+  description: 'Production-ready Express API with TypeScript, authentication, and database',
+  type: 'express-app',
+  version: '1.0.0',
+  author: 'OpenNode',
+  tags: ['express', 'api', 'rest', 'typescript'],
+  complexity: 'moderate',
+  features: ['Express', 'TypeScript', 'JWT Auth', 'PostgreSQL', 'Redis', 'Docker'],
+  files: this.getExpressTemplateFiles(),
+  variables: [
+    ...this.getCommonVariables(),
+    {
+      name: 'database',
+      description: 'Database type',
+      type: 'string',
+      default: 'postgresql'
+    }
+  ],
+  dependencies: {
+    'express': '^4.18.0',
+    'helmet': '^7.0.0',
+    'cors': '^2.8.5',
+    'compression': '^1.7.4',
+    'express-rate-limit': '^6.10.0',
+    'jsonwebtoken': '^9.0.0',
+    'bcrypt': '^5.1.0',
+    'pg': '^8.11.0',
+    'redis': '^4.6.0',
+    'winston': '^3.10.0',
+    'dotenv': '^16.3.0'
+  },
+  devDependencies: {
+    'typescript': '^5.2.0',
+    '@types/node': '^20.5.0',
+    '@types/express': '^4.17.0',
+    '@types/cors': '^2.8.0',
+    '@types/compression': '^1.7.0',
+    '@types/jsonwebtoken': '^9.0.0',
+    '@types/bcrypt': '^5.0.0',
+    'jest': '^29.6.0',
+    'supertest': '^6.3.0',
+    '@types/supertest': '^2.0.0',
+    'nodemon': '^3.0.0',
+    'ts-node': '^10.9.0'
+  },
+  scripts: {
+    'build': 'tsc',
+    'dev': 'nodemon --exec ts-node src/server.ts',
+    'start': 'node dist/server.js',
+    'test': 'jest',
+    'test:integration': 'jest --testPathPattern=integration',
+    'docker:build': 'docker build -t api .',
+    'docker:run': 'docker-compose up'
+  }
+});
+}
+
+async loadTemplate(templateId: string): Promise<Template | null> {
+  return this.templates.get(templateId) || null;
+}
+
+async loadCustomTemplate(templatePath: string): Promise<Template> {
+  const templateFile = path.join(templatePath, 'template.json');
+  
+  if (!await fs.pathExists(templateFile)) {
+    throw new Error(`Template file not found: ${templateFile}`);
+  }
+
+  const templateData = await fs.readJson(templateFile);
+  return this.validateTemplate(templateData);
+}
+
+async generateFromTemplate(
+  template: Template, 
+  context: TemplateContext, 
+  outputPath: string
+): Promise<{ files: string[]; errors: string[] }> {
+  const files: string[] = [];
+  const errors: string[] = [];
+
+  try {
+    await fs.ensureDir(outputPath);
+
+    // Process template files
+    for (const file of template.files) {
+      if (this.shouldIncludeFile(file, context)) {
+        const processedContent = this.processTemplate(file.content, context);
+        const filePath = path.join(outputPath, file.path);
+        
+        await fs.ensureDir(path.dirname(filePath));
+        await fs.writeFile(filePath, processedContent);
+        
+        if (file.executable) {
+          await fs.chmod(filePath, '755');
+        }
+        
+        files.push(file.path);
+      }
+    }
+
+    // Generate package.json
+    const packageJson = this.generatePackageJson(template, context);
+    await fs.writeJson(path.join(outputPath, 'package.json'), packageJson, { spaces: 2 });
+    files.push('package.json');
+
+    // Generate additional standard files
+    const standardFiles = await this.generateStandardFiles(template, context, outputPath);
+    files.push(...standardFiles);
+
+  } catch (error) {
+    this.logger.error('Template generation failed', error);
+    errors.push(String(error));
+  }
+
+  return { files, errors };
+}
+
+private validateTemplate(templateData: any): Template {
+  // Validate required fields
+  const required = ['id', 'name', 'type', 'files'];
+  for (const field of required) {
+    if (!templateData[field]) {
+      throw new Error(`Template missing required field: ${field}`);
+    }
+  }
+
+  return {
+    id: templateData.id,
+    name: templateData.name,
+    description: templateData.description || '',
+    type: templateData.type,
+    version: templateData.version || '1.0.0',
+    author: templateData.author || 'Unknown',
+    tags: templateData.tags || [],
+    complexity: templateData.complexity || 'moderate',
+    features: templateData.features || [],
+    files: templateData.files || [],
+    variables: templateData.variables || [],
+    dependencies: templateData.dependencies || {},
+    devDependencies: templateData.devDependencies || {},
+    scripts: templateData.scripts || {}
+  };
+}
+
+private shouldIncludeFile(file: TemplateFile, context: TemplateContext): boolean {
+  if (!file.conditions || file.conditions.length === 0) {
+    return true;
+  }
+
+  return file.conditions.every(condition => this.evaluateCondition(condition, context));
+}
+
+private evaluateCondition(condition: TemplateCondition, context: TemplateContext): boolean {
+  const value = context[condition.variable];
+
+  switch (condition.operator) {
+    case 'eq':
+      return value === condition.value;
+    case 'ne':
+      return value !== condition.value;
+    case 'gt':
+      return value > condition.value;
+    case 'lt':
+      return value < condition.value;
+    case 'includes':
+      return Array.isArray(value) && value.includes(condition.value);
+    case 'exists':
+      return value !== undefined && value !== null;
+    default:
+      return true;
+  }
+}
+
+private processTemplate(content: string, context: TemplateContext): string {
+  return content.replace(/\{\{(\w+)\}\}/g, (match, variable) => {
+    return context[variable] || match;
+  });
+}
+
+private getCommonVariables(): TemplateVariable[] {
+  return [
+    {
+      name: 'packageName',
+      description: 'Package name',
+      type: 'string',
+      required: true
+    },
+    {
+      name: 'description',
+      description: 'Package description',
+      type: 'string',
+      required: true
+    },
+    {
+      name: 'author',
+      description: 'Package author',
+      type: 'string',
+      required: false
+    },
+    {
+      name: 'license',
+      description: 'Package license',
+      type: 'string',
+      default: 'MIT'
+    }
+  ];
+}
+
+private getLibraryTemplateFiles(): TemplateFile[] {
+  return [
+    {
+      path: 'src/index.ts',
+      content: `/**
+ * {{packageName}}
+ * {{description}}
+ */
+
+export interface {{className}}Options {
+  debug?: boolean;
+  timeout?: number;
+}
+
+export class {{className}} {
+  private options: {{className}}Options;
+
+  constructor(options: {{className}}Options = {}) {
+    this.options = {
+      debug: false,
+      timeout: 5000,
+      ...options
+    };
+  }
+
+  /**
+   * Main processing method
+   */
+  public async process<T>(input: T): Promise<T> {
+    if (this.options.debug) {
+      console.log('Processing:', input);
+    }
+
+    // Implement your logic here
+    return input;
+  }
+}
+
+export default {{className}};
+`
+    },
+    {
+      path: 'src/utils/index.ts',
+      content: `/**
+ * Utility functions
+ */
+
+export function isValid(value: unknown): boolean {
+  return value !== null && value !== undefined;
+}
+
+export function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export class CustomError extends Error {
+  constructor(message: string, public code: string) {
+    super(message);
+    this.name = 'CustomError';
+  }
+}
+`
+    },
+    {
+      path: 'rollup.config.js',
+      content: `import typescript from '@rollup/plugin-typescript';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
+
+export default {
+  input: 'src/index.ts',
+  output: [
+    {
+      file: 'dist/index.js',
+      format: 'cjs',
+      sourcemap: true,
+    },
+    {
+      file: 'dist/index.esm.js',
+      format: 'esm',
+      sourcemap: true,
+    },
+  ],
+  plugins: [
+    nodeResolve(),
+    commonjs(),
+    typescript({
+      tsconfig: './tsconfig.json',
+      declaration: true,
+      declarationDir: 'dist',
+    }),
+  ],
+  external: ['fs', 'path', 'crypto', 'util'],
+};
+`
+    }
+  ];
+}
+
+private getCLITemplateFiles(): TemplateFile[] {
+  return [
+    {
+      path: 'src/index.ts',
+      content: `#!/usr/bin/env node
+
+import { Command } from 'commander';
+import chalk from 'chalk';
+import inquirer from 'inquirer';
+import { version } from '../package.json';
+
+const program = new Command();
+
+program
+  .name('{{binName}}')
+  .description('{{description}}')
+  .version(version);
+
+program
+  .command('init')
+  .description('Initialize a new project')
+  .option('-n, --name <name>', 'Project name')
+  .action(async (options) => {
+    const answers = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'name',
+        message: 'Project name:',
+        default: options.name || 'my-project',
+      },
+      {
+        type: 'list',
+        name: 'type',
+        message: 'Project type:',
+        choices: ['typescript', 'javascript'],
+      },
+    ]);
+
+    console.log(chalk.green('✨ Creating project...'));
+    console.log(chalk.gray(\`Name: \${answers.name}\`));
+    console.log(chalk.gray(\`Type: \${answers.type}\`));
+  });
+
+program.parse();
+`,
+      executable: true
+    },
+    {
+      path: 'src/commands/index.ts',
+      content: `export * from './init';
+export * from './build';
+export * from './test';
+`
+    }
+  ];
+}
+
+private getReactTemplateFiles(): TemplateFile[] {
+  return [
+    {
+      path: 'src/components/index.tsx',
+      content: `import React from 'react';
+import styled from '@emotion/styled';
+
+export interface {{className}}Props {
+  children?: React.ReactNode;
+  variant?: 'primary' | 'secondary';
+  size?: 'small' | 'medium' | 'large';
+  onClick?: () => void;
+}
+
+const StyledComponent = styled.div<{{className}}Props>\`
+  padding: \${props => {
+    switch (props.size) {
+      case 'small': return '8px 16px';
+      case 'large': return '16px 32px';
+      default: return '12px 24px';
+    }
+  }};
+  
+  background-color: \${props => 
+    props.variant === 'primary' ? '#007bff' : '#6c757d'
+  };
+  
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  
+  &:hover {
+    opacity: 0.9;
+  }
+\`;
+
+export const {{className}}: React.FC<{{className}}Props> = ({
+  children,
+  variant = 'primary',
+  size = 'medium',
+  onClick,
+}) => {
+  return (
+    <StyledComponent
+      variant={variant}
+      size={size}
+      onClick={onClick}
+    >
+      {children}
+    </StyledComponent>
+  );
+};
+
+export default {{className}};
+`
+    },
+    {
+      path: 'src/stories/Component.stories.tsx',
+      content: `import type { Meta, StoryObj } from '@storybook/react';
+import { {{className}} } from '../components';
+
+const meta = {
+  title: 'Components/{{className}}',
+  component: {{className}},
+  parameters: {
+    layout: 'centered',
+  },
+  tags: ['autodocs'],
+  argTypes: {
+    variant: {
+      control: 'radio',
+      options: ['primary', 'secondary'],
+    },
+    size: {
+      control: 'radio',
+      options: ['small', 'medium', 'large'],
+    },
+  },
+} satisfies Meta<typeof {{className}}>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Primary: Story = {
+  args: {
+    children: 'Primary Button',
+    variant: 'primary',
+  },
+};
+
+export const Secondary: Story = {
+  args: {
+    children: 'Secondary Button',
+    variant: 'secondary',
+  },
+};
+
+export const Small: Story = {
+  args: {
+    children: 'Small Button',
+    size: 'small',
+  },
+};
+
+export const Large: Story = {
+  args: {
+    children: 'Large Button',
+    size: 'large',
+  },
+};
+`
+    },
+    {
+      path: '.storybook/main.ts',
+      content: `import type { StorybookConfig } from '@storybook/react-vite';
+
+const config: StorybookConfig = {
+  stories: ['../src/**/*.stories.@(js|jsx|ts|tsx|mdx)'],
+  addons: [
+    '@storybook/addon-essentials',
+    '@storybook/addon-interactions',
+  ],
+  framework: {
+    name: '@storybook/react-vite',
+    options: {},
+  },
+};
+
+export default config;
+`
+    }
+  ];
+}
+
+private getExpressTemplateFiles(): TemplateFile[] {
+  return [
+    {
+      path: 'src/server.ts',
+      content: `import express from 'express';
+import helmet from 'helmet';
+import cors from 'cors';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
+import { config } from './config';
+import { logger } from './utils/logger';
+import { errorHandler } from './middleware/error';
+import { authMiddleware } from './middleware/auth';
+import routes from './routes';
+
+const app = express();
+
+// Security middleware
+app.use(helmet());
+app.use(cors(config.cors));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+});
+app.use('/api/', limiter);
+
+// Body parsing and compression
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(compression());
+
+// Routes
+app.use('/api/v1', routes);
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Error handling
+app.use(errorHandler);
+
+const PORT = config.port || 3000;
+
+app.listen(PORT, () => {
+  logger.info(\`Server running on port \${PORT}\`);
+});
+
+export default app;
+`
+    },
+    {
+      path: 'src/config/index.ts',
+      content: `import dotenv from 'dotenv';
+
+dotenv.config();
+
+export const config = {
+  env: process.env.NODE_ENV || 'development',
+  port: parseInt(process.env.PORT || '3000', 10),
+  
+  database: {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    name: process.env.DB_NAME || '{{packageName}}',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || '',
+  },
+  
+  redis: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+  },
+  
+  jwt: {
+    secret: process.env.JWT_SECRET || 'your-secret-key',
+    expiresIn: '7d',
+  },
+  
+  cors: {
+    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
+    credentials: true,
+  },
+};
+`
+    },
+    {
+      path: 'Dockerfile',
+      content: `FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY --from=builder /app/dist ./dist
+
+EXPOSE 3000
+
+CMD ["node", "dist/server.js"]
+`
+    },
+    {
+      path: 'docker-compose.yml',
+      content: `version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=postgres
+      - REDIS_HOST=redis
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB={{packageName}}
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
+`
+    }
+  ];
+}
+
+private generatePackageJson(template: Template, context: TemplateContext): any {
+  const className = this.toPascalCase(context.packageName);
+  
+  return {
+    name: context.packageName,
+    version: context.version || '1.0.0',
+    description: context.description,
+    main: template.type === 'cli-tool' ? 'dist/index.js' : 'dist/index.js',
+    types: 'dist/index.d.ts',
+    bin: template.type === 'cli-tool' ? {
+      [context.binName || context.packageName]: './dist/index.js'
+    } : undefined,
+    scripts: {
+      ...template.scripts,
+      prepare: 'npm run build',
+    },
+    keywords: template.tags,
+    author: context.author,
+    license: context.license,
+    dependencies: template.dependencies,
+    devDependencies: template.devDependencies,
+    engines: {
+      node: '>=16.0.0'
+    },
+    files: [
+      'dist',
+      'README.md',
+      'LICENSE'
+    ]
+  };
+}
+
+private async generateStandardFiles(
+  template: Template, 
+  context: TemplateContext, 
+  outputPath: string
+): Promise<string[]> {
+  const files: string[] = [];
+
+  // TypeScript configuration
+  if (context.enableTypeScript !== false) {
+    const tsConfig = this.generateTsConfig(template);
+    await fs.writeJson(path.join(outputPath, 'tsconfig.json'), tsConfig, { spaces: 2 });
+    files.push('tsconfig.json');
+  }
+
+  // Jest configuration
+  if (context.enableTesting !== false) {
+    const jestConfig = this.generateJestConfig();
+    await fs.writeFile(path.join(outputPath, 'jest.config.js'), jestConfig);
+    files.push('jest.config.js');
+  }
+
+  // ESLint configuration
+  if (context.enableLinting !== false) {
+    const eslintConfig = this.generateEslintConfig(template);
+    await fs.writeFile(path.join(outputPath, '.eslintrc.js'), eslintConfig);
+    files.push('.eslintrc.js');
+  }
+
+  // Prettier configuration
+  const prettierConfig = this.generatePrettierConfig();
+  await fs.writeJson(path.join(outputPath, '.prettierrc'), prettierConfig, { spaces: 2 });
+  files.push('.prettierrc');
+
+  // Git ignore
+  const gitignore = this.generateGitignore(template);
+  await fs.writeFile(path.join(outputPath, '.gitignore'), gitignore);
+  files.push('.gitignore');
+
+  // README
+  if (context.enableDocumentation !== false) {
+    const readme = this.generateReadme(template, context);
+    await fs.writeFile(path.join(outputPath, 'README.md'), readme);
+    files.push('README.md');
+  }
+
+  return files;
+}
+
+private generateTsConfig(template: Template): any {
+  const baseConfig = {
+    compilerOptions: {
+      target: 'ES2020',
+      module: 'commonjs',
+      lib: ['ES2020'],
+      declaration: true,
+      declarationMap: true,
+      sourceMap: true,
+      outDir: './dist',
+      rootDir: './src',
+      strict: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      forceConsistentCasingInFileNames: true,
+      resolveJsonModule: true,
+      moduleResolution: 'node',
+      allowSyntheticDefaultImports: true
+    },
+    include: ['src/**/*'],
+    exclude: ['node_modules', 'dist', '**/*.test.ts', '**/*.spec.ts']
+  };
+
+  // React-specific settings
+  if (template.type === 'react-component') {
+    baseConfig.compilerOptions.jsx = 'react';
+    baseConfig.compilerOptions.lib.push('DOM', 'DOM.Iterable');
+  }
+
+  return baseConfig;
+}
+
+private generateJestConfig(): string {
+  return `module.exports = {
+    preset: 'ts-jest',
+    testEnvironment: 'node',
+    roots: ['<rootDir>/src', '<rootDir>/test'],
+    testMatch: ['**/?(*.)+(spec|test).[jt]s?(x)'],
+    collectCoverageFrom: [
+      'src/**/*.{js,ts,jsx,tsx}',
+      '!src/**/*.d.ts',
+      '!src/**/index.ts',
+    ],
+    coverageThreshold: {
+      global: {
+        branches: 80,
+        functions: 80,
+        lines: 80,
+        statements: 80,
+      },
+    },
+  };
+`;
+}
+
+private generateEslintConfig(template: Template): string {
+  const reactRules = template.type === 'react-component' ? `
+    'react/prop-types': 'off',
+    'react/react-in-jsx-scope': 'off',
+    'react-hooks/rules-of-hooks': 'error',
+    'react-hooks/exhaustive-deps': 'warn',` : '';
+
+  return `module.exports = {
+    root: true,
+    parser: '@typescript-eslint/parser',
+    parserOptions: {
+      ecmaVersion: 2020,
+      sourceType: 'module',
+      ${template.type === 'react-component' ? 'ecmaFeatures: { jsx: true },' : ''}
+    },
+    extends: [
+      'eslint:recommended',
+      'plugin:@typescript-eslint/recommended',
+      ${template.type === 'react-component' ? "'plugin:react/recommended'," : ''}
+      ${template.type === 'react-component' ? "'plugin:react-hooks/recommended'," : ''}
+      'prettier',
+    ],
+    plugins: [
+      '@typescript-eslint',
+      ${template.type === 'react-component' ? "'react', 'react-hooks'," : ''}
+    ],
+    rules: {
+      '@typescript-eslint/explicit-module-boundary-types': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      ${reactRules}
+    },
+    env: {
+      node: true,
+      es2020: true,
+      jest: true,
+    },
+  };
+`;
+}
+
+private generatePrettierConfig(): any {
+  return {
+    semi: true,
+    trailingComma: 'es5',
+    singleQuote: true,
+    printWidth: 100,
+    tabWidth: 2,
+    useTabs: false,
+    bracketSpacing: true,
+    arrowParens: 'avoid',
+    endOfLine: 'lf'
+  };
+}
+
+private generateGitignore(template: Template): string {
+  let gitignore = `# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/
+`;
+
+  // Template-specific additions
+  if (template.type === 'react-component') {
+    gitignore += `
+# Storybook
+.storybook-out/
+storybook-static/
+`;
+  }
+
+  return gitignore;
+}
+
+private generateReadme(template: Template, context: TemplateContext): string {
+  const className = this.toPascalCase(context.packageName);
+  
+  return `# ${context.packageName}
+
+${context.description}
+
+## Features
+
+${template.features.map(f => `- ${f}`).join('\n')}
+
+## Installation
+
+\`\`\`bash
+npm install ${context.packageName}
+\`\`\`
+
+## Usage
+
+${this.getUsageExample(template, context)}
+
+## Development
+
+### Setup
+
+\`\`\`bash
+git clone <repository-url>
+cd ${context.packageName}
+npm install
+\`\`\`
+
+### Scripts
+
+${Object.entries(template.scripts).map(([key, value]) => `- \`npm run ${key}\` - ${value}`).join('\n')}
+
+## License
+
+${context.license} License
+`;
+}
+
+private getUsageExample(template: Template, context: TemplateContext): string {
+  const className = this.toPascalCase(context.packageName);
+
+  switch (template.type) {
+    case 'cli-tool':
+      return `\`\`\`bash
+${context.binName || context.packageName} init --name my-project
+\`\`\``;
+
+    case 'react-component':
+      return `\`\`\`typescript
+import { ${className} } from '${context.packageName}';
+
+function App() {
+  return (
+    <${className} variant="primary" size="medium">
+      Click Me
+    </${className}>
+  );
+}
+\`\`\``;
+
+    case 'express-app':
+      return `\`\`\`typescript
+import app from '${context.packageName}';
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(\`Server running on port \${PORT}\`);
+});
+\`\`\``;
+
+    default:
+      return `\`\`\`typescript
+import { ${className} } from '${context.packageName}';
+
+const instance = new ${className}({ debug: true });
+const result = await instance.process(data);
+\`\`\``;
+  }
+}
+
+private toPascalCase(str: string): string {
+  return str
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase())
+    .replace(/\s/g, '');
+}
+
+async getAllTemplates(): Promise<Template[]> {
+  return Array.from(this.templates.values());
+}
+
+async getTemplatesByType(type: PackageType): Promise<Template[]> {
+  return Array.from(this.templates.values()).filter(t => t.type === type);
+}
+
+async searchTemplates(query: string): Promise<Template[]> {
+  const lowerQuery = query.toLowerCase();
+  return Array.from(this.templates.values()).filter(template => 
+    template.name.toLowerCase().includes(lowerQuery) ||
+    template.description.toLowerCase().includes(lowerQuery) ||
+    template.tags.some(tag => tag.toLowerCase().includes(lowerQuery))
+  );
+}
+} 

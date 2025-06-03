@@ -1,0 +1,28 @@
+# Development files
+src/
+test/
+.nyc_output/
+coverage/
+*.log
+
+# Build files
+tsconfig*.json
+rollup.config.js
+jest.config.js
+
+# Git and CI
+.git/
+.github/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+temp/
+*.tmp

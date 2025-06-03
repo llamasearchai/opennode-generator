@@ -1,0 +1,66 @@
+{
+  "id": "react-component",
+  "name": "React Component Library",
+  "description": "React component library with Storybook and testing",
+  "version": "1.0.0",
+  "author": "OpenNode",
+  "type": "library",
+  "complexity": "moderate",
+  "features": [
+    "React",
+    "TypeScript",
+    "Storybook",
+    "Jest",
+    "Rollup"
+  ],
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@storybook/react": "^7.4.0",
+    "@storybook/addon-essentials": "^7.4.0",
+    "jest": "^29.6.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/jest-dom": "^6.1.0",
+    "rollup": "^3.28.0",
+    "@rollup/plugin-typescript": "^11.1.2"
+  },
+  "scripts": {
+    "build": "rollup -c",
+    "test": "jest",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
+  },
+  "files": [
+    {
+      "path": "src/components/Button/Button.tsx",
+      "content": "import React from 'react';\n\nexport interface ButtonProps {\n  /** The text to display on the button */\n  children: React.ReactNode;\n  /** Button variant */\n  variant?: 'primary' | 'secondary' | 'danger';\n  /** Button size */\n  size?: 'small' | 'medium' | 'large';\n  /** Click handler */\n  onClick?: () => void;\n  /** Is the button disabled? */\n  disabled?: boolean;\n}\n\nexport const Button: React.FC<ButtonProps> = ({\n  children,\n  variant = 'primary',\n  size = 'medium',\n  onClick,\n  disabled = false,\n  ...props\n}) => {\n  const baseClasses = 'btn';\n  const variantClasses = {\n    primary: 'btn-primary',\n    secondary: 'btn-secondary',\n    danger: 'btn-danger',\n  };\n  const sizeClasses = {\n    small: 'btn-sm',\n    medium: 'btn-md',\n    large: 'btn-lg',\n  };\n\n  const className = [\n    baseClasses,\n    variantClasses[variant],\n    sizeClasses[size],\n  ].join(' ');\n\n  return (\n    <button\n      className={className}\n      onClick={onClick}\n      disabled={disabled}\n      {...props}\n    >\n      {children}\n    </button>\n  );\n};\n\nexport default Button;\n"
+    },
+    {
+      "path": "src/components/Button/Button.stories.tsx",
+      "content": "import type { Meta, StoryObj } from '@storybook/react';\nimport { Button } from './Button';\n\nconst meta: Meta<typeof Button> = {\n  title: 'Components/Button',\n  component: Button,\n  parameters: {\n    layout: 'centered',\n  },\n  tags: ['autodocs'],\n  argTypes: {\n    variant: {\n      control: { type: 'select' },\n      options: ['primary', 'secondary', 'danger'],\n    },\n    size: {\n      control: { type: 'select' },\n      options: ['small', 'medium', 'large'],\n    },\n  },\n};\n\nexport default meta;\ntype Story = StoryObj<typeof meta>;\n\nexport const Primary: Story = {\n  args: {\n    variant: 'primary',\n    children: 'Primary Button',\n  },\n};\n\nexport const Secondary: Story = {\n  args: {\n    variant: 'secondary',\n    children: 'Secondary Button',\n  },\n};\n\nexport const Danger: Story = {\n  args: {\n    variant: 'danger',\n    children: 'Danger Button',\n  },\n};\n\nexport const Small: Story = {\n  args: {\n    size: 'small',\n    children: 'Small Button',\n  },\n};\n\nexport const Large: Story = {\n  args: {\n    size: 'large',\n    children: 'Large Button',\n  },\n};\n"
+    },
+    {
+      "path": "src/components/Button/Button.test.tsx",
+      "content": "import { render, fireEvent, screen } from '@testing-library/react';\nimport '@testing-library/jest-dom';\nimport { Button } from './Button';\n\ndescribe('Button', () => {\n  it('renders correctly', () => {\n    render(<Button>Test Button</Button>);\n    expect(screen.getByRole('button')).toBeInTheDocument();\n    expect(screen.getByText('Test Button')).toBeInTheDocument();\n  });\n\n  it('handles click events', () => {\n    const handleClick = jest.fn();\n    render(<Button onClick={handleClick}>Click me</Button>);\n    \n    fireEvent.click(screen.getByRole('button'));\n    expect(handleClick).toHaveBeenCalledTimes(1);\n  });\n\n  it('applies variant classes correctly', () => {\n    render(<Button variant=\"danger\">Danger Button</Button>);\n    expect(screen.getByRole('button')).toHaveClass('btn-danger');\n  });\n\n  it('applies size classes correctly', () => {\n    render(<Button size=\"large\">Large Button</Button>);\n    expect(screen.getByRole('button')).toHaveClass('btn-lg');\n  });\n\n  it('disables button when disabled prop is true', () => {\n    render(<Button disabled>Disabled Button</Button>);\n    expect(screen.getByRole('button')).toBeDisabled();\n  });\n});\n"
+    },
+    {
+      "path": "src/index.ts",
+      "content": "export { Button } from './components/Button/Button';\nexport type { ButtonProps } from './components/Button/Button';\n"
+    }
+  ],
+  "metadata": {
+    "tags": [
+      "react",
+      "components",
+      "storybook",
+      "typescript"
+    ],
+    "category": "Frontend",
+    "lastUpdated": "2025-06-01T14:54:32.987Z"
+  }
+}

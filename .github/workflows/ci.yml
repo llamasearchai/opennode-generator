@@ -1,0 +1,760 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  release:
+    types: [published]
+  schedule:
+    - cron: '0 2 * * 1' # Weekly security scan
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+  COVERAGE_THRESHOLD: '80'
+  PERFORMANCE_BUDGET: '2000'
+
+jobs:
+  # Cross-platform testing matrix
+  test:
+    name: Test Suite (${{ matrix.os }}, Node ${{ matrix.node-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 18, 20]
+        exclude:
+          - os: windows-latest
+            node-version: 16
+          - os: macos-latest
+            node-version: 16
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Lint check
+        run: npm run lint:check
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CI: true
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CI: true
+
+      - name: Check coverage threshold
+        run: |
+          npx nyc check-coverage --lines ${{ env.COVERAGE_THRESHOLD }} --functions ${{ env.COVERAGE_THRESHOLD }} --branches ${{ env.COVERAGE_THRESHOLD }} --statements ${{ env.COVERAGE_THRESHOLD }}
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 18
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.node-version }}
+          path: |
+            coverage/
+            test-results.xml
+            junit.xml
+
+  # Comprehensive security auditing
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level high
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+      - name: Run CodeQL analysis
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v2
+
+      - name: Run OWASP ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.7.0
+        with:
+          target: 'http://localhost:8000'
+
+      - name: Upload security scan results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: |
+            snyk-report.json
+            codeql-results/
+            zap-baseline-report.html
+
+  # Static analysis and code quality
+  quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    needs: [test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run SonarCloud scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Run code complexity analysis
+        run: |
+          npm run complexity
+          npm run complexity:report
+
+      - name: Run dependency analysis
+        run: |
+          npm run depcheck
+          npx license-checker --onlyAllow 'MIT;BSD;ISC;Apache-2.0' --production
+
+      - name: Check for outdated dependencies
+        run: npm outdated --long || true
+
+      - name: Check for unused files
+        run: npm run clean:unused
+
+      - name: Analyze bundle size
+        run: |
+          npm run build:analyze
+          npm run bundlesize
+
+      - name: Upload quality reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: quality-reports
+          path: |
+            complexity-report.json
+            depcheck-report.json
+            bundle-analyzer-report.html
+            license-report.json
+
+  # Mutation testing for test quality
+  mutation-test:
+    name: Mutation Testing
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.event_name == 'push' && contains(github.ref, 'main')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Stryker mutation testing
+        run: npx stryker run
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Upload mutation test report
+        uses: actions/upload-artifact@v3
+        with:
+          name: mutation-test-report
+          path: reports/mutation/
+
+  # API testing with comprehensive scenarios
+  api-test:
+    name: API Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        run: |
+          cd api
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx pytest-cov
+
+      - name: Start API server
+        run: |
+          cd api
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
+          sleep 10
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REDIS_URL: redis://localhost:6379
+
+      - name: Run API tests with coverage
+        run: |
+          cd api
+          pytest tests/ -v --cov=. --cov-report=xml --cov-report=html
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REDIS_URL: redis://localhost:6379
+
+      - name: Run API load tests
+        run: |
+          cd api
+          python scripts/load_test.py
+        env:
+          API_BASE_URL: http://localhost:8000
+
+      - name: Upload API test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: api-test-results
+          path: |
+            api/htmlcov/
+            api/coverage.xml
+            api/load-test-results.json
+
+  # Docker multi-architecture builds
+  docker:
+    name: Docker Build & Test
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and test Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: opennode/forge:test
+
+      - name: Test Docker image functionality
+        run: |
+          docker run --rm opennode/forge:test --version
+          docker run --rm opennode/forge:test generate --help
+
+      - name: Run container security scan
+        uses: anchore/scan-action@v3
+        with:
+          image: opennode/forge:test
+          fail-build: true
+          severity-cutoff: high
+
+      - name: Build and push multi-arch images
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            opennode/forge:latest
+            opennode/forge:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+      - name: Build and push API image
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.api
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            opennode/forge-api:latest
+            opennode/forge-api:${{ github.sha }}
+            ghcr.io/${{ github.repository }}-api:latest
+            ghcr.io/${{ github.repository }}-api:${{ github.sha }}
+
+  # Comprehensive E2E testing
+  e2e:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: [test]
+    timeout-minutes: 45
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd api && pip install -r requirements.txt
+
+      - name: Build project
+        run: npm run build
+
+      - name: Start services
+        run: |
+          cd api
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
+          echo "Waiting for server to start..."
+          timeout 30 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REDIS_URL: redis://localhost:6379
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          API_BASE_URL: http://localhost:8000
+          TEST_TIMEOUT: 60000
+
+      - name: Run visual regression tests
+        run: npm run test:visual
+        env:
+          API_BASE_URL: http://localhost:8000
+
+      - name: Upload E2E test artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: e2e-test-results
+          path: |
+            e2e-results/
+            screenshots/
+            videos/
+
+  # Performance testing and budgets
+  performance:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    needs: [test]
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run performance benchmarks
+        run: |
+          npm run benchmark
+          npm run perf:analyze
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CI: true
+
+      - name: Check performance budgets
+        run: |
+          npm run perf:check
+          npm run lighthouse:ci
+        env:
+          PERFORMANCE_BUDGET: ${{ env.PERFORMANCE_BUDGET }}
+
+      - name: Run memory leak tests
+        run: npm run test:memory
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: performance-results
+          path: |
+            performance.log
+            lighthouse-results/
+            memory-test-results.json
+            bundle-size-report.json
+
+  # Accessibility testing
+  accessibility:
+    name: Accessibility Testing
+    runs-on: ubuntu-latest
+    needs: [test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run accessibility tests
+        run: |
+          npm run test:a11y
+          npm run pa11y
+
+      - name: Upload accessibility reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: accessibility-reports
+          path: |
+            a11y-results/
+            pa11y-report.json
+
+  # Staging deployment
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [test, security, api-test, docker, quality]
+    if: github.ref == 'refs/heads/develop'
+    
+    environment:
+      name: staging
+      url: https://staging.opennode.dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment..."
+          # Add Kubernetes/Helm deployment commands
+          kubectl apply -f k8s/staging/
+        env:
+          STAGING_API_KEY: ${{ secrets.STAGING_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          KUBECONFIG: ${{ secrets.STAGING_KUBECONFIG }}
+
+      - name: Run smoke tests
+        run: |
+          npm run test:smoke -- --base-url https://staging.opennode.dev
+
+      - name: Update deployment status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: context.payload.deployment.id,
+              state: 'success',
+              environment_url: 'https://staging.opennode.dev'
+            });
+
+  # Production deployment
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [test, security, api-test, docker, e2e, performance, mutation-test, accessibility]
+    if: github.event_name == 'release'
+    
+    environment:
+      name: production
+      url: https://opennode.dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production environment..."
+          kubectl apply -f k8s/production/
+        env:
+          PRODUCTION_API_KEY: ${{ secrets.PRODUCTION_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          KUBECONFIG: ${{ secrets.PRODUCTION_KUBECONFIG }}
+
+      - name: Run production smoke tests
+        run: |
+          npm run test:smoke -- --base-url https://opennode.dev
+
+      - name: Create GitHub release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            ## 🚀 Features
+            - Enhanced AI-powered package generation
+            - Improved OpenAI integration
+            - Better error handling and logging
+            
+            ## 🐛 Bug Fixes
+            - Fixed TypeScript compilation issues
+            - Improved test reliability
+            
+            ## 📦 Dependencies
+            - Updated all dependencies to latest versions
+            
+            ## 🔧 Development
+            - Enhanced CI/CD pipeline
+            - Improved test coverage
+            - Added comprehensive security scanning
+          draft: false
+          prerelease: false
+
+  # Comprehensive notification system
+  notify:
+    name: Notify Team
+    runs-on: ubuntu-latest
+    needs: [deploy-production, deploy-staging]
+    if: always()
+    
+    steps:
+      - name: Collect job statuses
+        id: status
+        run: |
+          echo "staging_status=${{ needs.deploy-staging.result }}" >> $GITHUB_OUTPUT
+          echo "production_status=${{ needs.deploy-production.result }}" >> $GITHUB_OUTPUT
+
+      - name: Notify Slack on success
+        if: steps.status.outputs.production_status == 'success'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#deployments'
+          text: |
+            🎉 OpenNode Forge deployment successful!
+            
+            **Production**: ✅ Deployed
+            **Version**: ${{ github.ref }}
+            **Commit**: ${{ github.sha }}
+            
+            [View Release](https://github.com/${{ github.repository }}/releases/latest)
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on failure
+        if: steps.status.outputs.production_status == 'failure' || steps.status.outputs.staging_status == 'failure'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#deployments'
+          text: |
+            ❌ OpenNode Forge deployment failed!
+            
+            **Staging**: ${{ steps.status.outputs.staging_status }}
+            **Production**: ${{ steps.status.outputs.production_status }}
+            **Branch**: ${{ github.ref }}
+            **Commit**: ${{ github.sha }}
+            
+            [View Workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send email notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: OpenNode Forge Deployment ${{ steps.status.outputs.production_status }}
+          body: |
+            Deployment Status Report
+            
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            
+            Staging: ${{ steps.status.outputs.staging_status }}
+            Production: ${{ steps.status.outputs.production_status }}
+            
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: OpenNode CI/CD <${{ secrets.EMAIL_USERNAME }}>
+
+  # Weekly maintenance and security updates
+  maintenance:
+    name: Weekly Maintenance
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Update dependencies
+        run: |
+          npx npm-check-updates -u
+          npm install
+          npm audit fix
+
+      - name: Run comprehensive security scan
+        run: |
+          npm run security:full-scan
+          npm run vulnerability:check
+
+      - name: Create PR for updates
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: weekly dependency updates and security fixes'
+          title: 'Weekly Maintenance: Dependency Updates'
+          body: |
+            Automated weekly maintenance updates:
+            
+            - Updated dependencies to latest versions
+            - Applied security patches
+            - Fixed vulnerabilities
+            
+            **Security Scan Results**: See attached artifacts
+          branch: maintenance/weekly-updates 

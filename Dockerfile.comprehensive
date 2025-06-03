@@ -1,0 +1,150 @@
+# OpenNode Forge Comprehensive Docker Image
+# ==========================================
+# 
+# Multi-stage Docker build for complete OpenNode Forge platform
+# Includes Node.js CLI, FastAPI backend, and all dependencies
+
+# Stage 1: Node.js Build Environment
+FROM node:20-alpine AS node-builder
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git \
+    curl
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install Node.js dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy source code
+COPY src/ ./src/
+COPY templates/ ./templates/
+COPY test/ ./test/
+
+# Build TypeScript
+RUN npm run build
+
+# Stage 2: Python Environment
+FROM python:3.11-slim AS python-builder
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY api/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Stage 3: Production Environment
+FROM node:20-alpine AS production
+
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    curl \
+    git \
+    bash \
+    && ln -sf python3 /usr/bin/python
+
+# Create app user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S opennode -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy Node.js application from builder
+COPY --from=node-builder --chown=opennode:nodejs /app/node_modules ./node_modules
+COPY --from=node-builder --chown=opennode:nodejs /app/dist ./dist
+COPY --from=node-builder --chown=opennode:nodejs /app/package*.json ./
+COPY --from=node-builder --chown=opennode:nodejs /app/templates ./templates
+
+# Install Python and FastAPI dependencies
+COPY api/requirements.txt ./api/
+RUN pip3 install --no-cache-dir -r api/requirements.txt
+
+# Copy FastAPI application
+COPY --chown=opennode:nodejs api/ ./api/
+
+# Copy additional files
+COPY --chown=opennode:nodejs README.md ./
+COPY --chown=opennode:nodejs LICENSE ./
+COPY --chown=opennode:nodejs docker-compose.yml ./
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/temp /app/output && \
+    chown -R opennode:nodejs /app
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PYTHONPATH=/app
+ENV PATH="/app/node_modules/.bin:$PATH"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Expose ports
+EXPOSE 3000 8000
+
+# Switch to non-root user
+USER opennode
+
+# Create startup script
+COPY --chown=opennode:nodejs <<EOF /app/start.sh
+#!/bin/bash
+set -e
+
+echo "Starting OpenNode Forge Platform..."
+
+# Start FastAPI backend in background
+echo "Starting FastAPI backend..."
+cd /app/api
+python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4 &
+FASTAPI_PID=\$!
+
+# Wait for FastAPI to start
+sleep 5
+
+# Check if FastAPI is running
+if ! curl -f http://localhost:8000/health > /dev/null 2>&1; then
+    echo "FastAPI failed to start"
+    exit 1
+fi
+
+echo "FastAPI backend started successfully"
+
+# Start Node.js CLI server (if needed)
+cd /app
+if [ "\$START_CLI_SERVER" = "true" ]; then
+    echo "Starting CLI server..."
+    node dist/cli/server.js &
+    CLI_PID=\$!
+fi
+
+echo "OpenNode Forge Platform is ready!"
+echo "FastAPI API: http://localhost:8000"
+echo "Documentation: http://localhost:8000/docs"
+
+# Keep container running
+wait \$FASTAPI_PID
+EOF
+
+RUN chmod +x /app/start.sh
+
+# Default command
+CMD ["/app/start.sh"] 

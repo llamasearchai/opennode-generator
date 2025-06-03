@@ -1,0 +1,58 @@
+{
+  "id": "typescript-library",
+  "name": "TypeScript Library",
+  "description": "A modern TypeScript library template",
+  "version": "1.0.0",
+  "author": "OpenNode",
+  "type": "library",
+  "complexity": "moderate",
+  "features": [
+    "TypeScript",
+    "Jest",
+    "ESLint",
+    "Prettier",
+    "Rollup"
+  ],
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.2.0",
+    "jest": "^29.6.0",
+    "@types/jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "eslint": "^8.47.0",
+    "@typescript-eslint/eslint-plugin": "^6.4.0",
+    "@typescript-eslint/parser": "^6.4.0",
+    "prettier": "^3.0.0",
+    "rollup": "^3.28.0",
+    "@rollup/plugin-typescript": "^11.1.2"
+  },
+  "scripts": {
+    "build": "rollup -c",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "files": [
+    {
+      "path": "src/index.ts",
+      "content": "/**\n * {{packageName}}\n * {{description}}\n */\n\nexport class {{className}} {\n  private version = '1.0.0';\n\n  constructor(private options: any = {}) {}\n\n  public execute(input: any): Promise<any> {\n    return Promise.resolve({\n      success: true,\n      data: input,\n      timestamp: new Date().toISOString(),\n    });\n  }\n\n  public getVersion(): string {\n    return this.version;\n  }\n}\n\nexport default {{className}};\n"
+    },
+    {
+      "path": "test/index.test.ts",
+      "content": "import { {{className}} } from '../src/index';\n\ndescribe('{{className}}', () => {\n  let instance: {{className}};\n\n  beforeEach(() => {\n    instance = new {{className}}();\n  });\n\n  it('should create an instance', () => {\n    expect(instance).toBeInstanceOf({{className}});\n  });\n\n  it('should execute successfully', async () => {\n    const result = await instance.execute({ test: 'data' });\n    expect(result.success).toBe(true);\n  });\n\n  it('should return version', () => {\n    expect(instance.getVersion()).toBe('1.0.0');\n  });\n});\n"
+    }
+  ],
+  "metadata": {
+    "tags": [
+      "typescript",
+      "library",
+      "jest",
+      "modern"
+    ],
+    "category": "Library",
+    "lastUpdated": "2025-06-01T14:54:32.986Z"
+  }
+}
